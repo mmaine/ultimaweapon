@@ -1,20 +1,16 @@
 const fs = require('fs');
 const path = require('path');
-
 const storageFilePath = path.join(__dirname, '..', 'storage.json');
 
-// Load data from storage
 function loadData() {
     if (!fs.existsSync(storageFilePath)) {
-        fs.writeFileSync(storageFilePath, JSON.stringify({}), 'utf8');
+        fs.writeFileSync(storageFilePath, JSON.stringify({ jailedUsers: {}, jailHistory: {} }), 'utf8');
     }
-    const fileContent = fs.readFileSync(storageFilePath, 'utf8');
-    return JSON.parse(fileContent);
+    return JSON.parse(fs.readFileSync(storageFilePath, 'utf8'));
 }
 
-// Save data to storage
 function saveData(data) {
-    fs.writeFileSync(storageFilePath, JSON.stringify(data, null, 2), 'utf8');
+    fs.writeFileSync(storageFilePath, JSON.stringify(data, null, 4), 'utf8');
 }
 
 exports.getJailedUsers = () => {
@@ -24,17 +20,14 @@ exports.getJailedUsers = () => {
 
 exports.setJailedUser = (userId, userInfo) => {
     const data = loadData();
-    data.jailedUsers = data.jailedUsers || {};
     data.jailedUsers[userId] = userInfo;
     saveData(data);
 };
 
 exports.removeJailedUser = (userId) => {
     const data = loadData();
-    if (data.jailedUsers) {
-        delete data.jailedUsers[userId];
-        saveData(data);
-    }
+    delete data.jailedUsers[userId];
+    saveData(data);
 };
 
 exports.getJailHistory = () => {
@@ -44,8 +37,6 @@ exports.getJailHistory = () => {
 
 exports.addJailHistory = (userId, history) => {
     const data = loadData();
-    data.jailHistory = data.jailHistory || {};
-    data.jailHistory[userId] = data.jailHistory[userId] || [];
-    data.jailHistory[userId].push(history);
+    data.jailHistory[userId] = (data.jailHistory[userId] || []).concat(history);
     saveData(data);
 };

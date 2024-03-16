@@ -1,92 +1,10 @@
 const { parseDuration, createEmbed } = require('../utils/helpers');
 const { muteRoleId, rolesToRestoreIds, logChannelId } = require('../config');
-const { setJailedUser, removeJailedUser, addJailHistory } = require('../utils/storage');
-const { EmbedBuilder } = require('discord.js');
-
-// Function to jail a user
-async function jailUser(guild, targetUser, reason, duration, rolesToRestore, muteRole, invokingUser) {
-    try {
-        const memberToJail = await guild.members.fetch(targetUser.id);
-        const userRoles = memberToJail.roles.cache.map(role => role.id);
-
-        const removedRoles = [];
-        for (const roleId of rolesToRestore) {
-            if (userRoles.includes(roleId)) {
-                const role = await guild.roles.fetch(roleId);
-                await memberToJail.roles.remove(role);
-                removedRoles.push(roleId);
-            }
-        }
-
-        const muteRoleInstance = await guild.roles.fetch(muteRole);
-        await memberToJail.roles.add(muteRoleInstance);
-
-        // Save the jail information
-        setJailedUser(targetUser.id, {
-            userId: targetUser.id,
-            guildId: guild.id,
-            originalRoles: removedRoles,
-            unjailTime: Date.now() + duration,
-            reason: reason,
-            by: invokingUser.tag,
-            count: (removedRoles.length || 0) + 1  // Increment jail count
-        });
-
-        // Add to jail history
-        addJailHistory(targetUser.id, {
-            by: invokingUser.tag,
-            reason: reason,
-            duration: `${duration / 1000}s`,  // Convert milliseconds to seconds for display
-            timestamp: new Date()
-        });
-
-        // Log jailing
-        const jailEmbed = createEmbed({
-            title: 'User Jailed',
-            description: `${targetUser.tag} (${targetUser.id}) has been jailed by ${invokingUser.tag} (${invokingUser.id}) for ${reason}.`,
-            fields: [{ name: 'Duration', value: `${duration / 1000}s`, inline: true }],
-            thumbnail: targetUser.displayAvatarURL()
-        });
-
-        const logChannel = await guild.channels.fetch(logChannelId);
-        if (logChannel && logChannel.isTextBased()) {
-            await logChannel.send({ embeds: [jailEmbed] });
-        }
-
-        // Setup auto-unjail after duration expires
-        setTimeout(async () => {
-            const refreshedMember = await guild.members.fetch(targetUser.id);
-            await refreshedMember.roles.remove(muteRoleInstance);
-            for (const roleId of removedRoles) {
-                const role = await guild.roles.fetch(roleId);
-                await refreshedMember.roles.add(role);
-            }
-
-            // Remove the jail information
-            removeJailedUser(targetUser.id);
-
-            // Log unjailing
-            const unjailEmbed = createEmbed({
-                title: 'User Unjailed',
-                description: `${targetUser.tag} (${targetUser.id}) has been released from jail.`,
-                fields: [],
-                thumbnail: targetUser.displayAvatarURL()
-            });
-
-            if (logChannel && logChannel.isTextBased()) {
-                await logChannel.send({ embeds: [unjailEmbed] });
-            }
-        }, duration);
-
-        return { success: true };
-    } catch (error) {
-        console.error('Error occurred while jailing user:', error);
-        return { success: false, error: error };
-    }
-}
+const { setJailedUser, addJailHistory } = require('../utils/storage');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 
 exports.handleJailCommand = async (interaction) => {
-    const user = interaction.options.getUser('user', true);
+    const targetUser = interaction.options.getUser('user', true);
     const reason = interaction.options.getString('reason', true);
     const durationString = interaction.options.getString('duration', true);
     const duration = parseDuration(durationString);
@@ -96,12 +14,54 @@ exports.handleJailCommand = async (interaction) => {
         return;
     }
 
-    const invokingUser = interaction.user;  // User who invoked the jail command
-    const result = await jailUser(interaction.guild, user, reason, duration, rolesToRestoreIds, muteRoleId, invokingUser);
+    const guild = interaction.guild;
+    const memberToJail = await guild.members.fetch(targetUser.id);
+    const originalRoles = memberToJail.roles.cache.filter(role => rolesToRestoreIds.includes(role.id)).map(role => role.id);
 
-    if (result.success) {
-        await interaction.reply({ content: `${user} has been jailed for ${durationString}. Reason: ${reason}.`, ephemeral: false });
-    } else {
-        await interaction.reply({ content: 'An error occurred while jailing the user. Please check the console for more details.', ephemeral: true });
-    }
+    await memberToJail.roles.remove(originalRoles).catch(console.error);
+    await memberToJail.roles.add(muteRoleId).catch(console.error);
+
+    const unjailTime = Date.now() + duration;
+    setJailedUser(targetUser.id, { originalRoles, unjailTime });
+    addJailHistory(targetUser.id, { jailer: interaction.user.id, reason, durationString, timestamp: Date.now() });
+
+    // Respond to the user who invoked the jail command
+    await interaction.reply({ content: `You have jailed ${targetUser} for ${durationString}.`, ephemeral: true });
+
+    // Construct and send the embed to the designated channel
+    const embed = new EmbedBuilder()
+        .setTitle(`${targetUser.tag} has been jailed.`)
+        .setDescription(`${targetUser.toString()} (${targetUser.id}) has been sentenced to jail by a staff. They have lost access to the server until they are unjailed.`)
+        .addFields(
+            { name: 'Jailer', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+            { name: 'Duration', value: durationString, inline: true },
+            { name: 'Unjail', value: `<t:${Math.floor(unjailTime / 1000)}:F>`, inline: true },
+            { name: 'Reason', value: reason, inline: false }
+        )
+        .setColor('#FF0000');
+
+    const logChannel = await guild.channels.fetch(logChannelId);
+    logChannel.send({ embeds: [embed] }).catch(console.error);
+
+    // Setup auto-unjail after duration expires
+    setTimeout(async () => {
+        try {
+            const refreshedMember = await guild.members.fetch(targetUser.id);
+            await refreshedMember.roles.remove(muteRoleId).catch(console.error);
+            for (const roleId of originalRoles) {
+                await refreshedMember.roles.add(roleId).catch(console.error);
+            }
+            removeJailedUser(targetUser.id);
+
+            // Construct and send the unjail embed message
+            const unjailEmbed = new EmbedBuilder()
+                .setTitle(`${targetUser.tag} has been unjailed.`)
+                .setDescription(`${targetUser.toString()} (${targetUser.id}) has been released from jail. They have gained access to the server once more.`)
+                .setColor('#00FF00');
+
+            logChannel.send({ embeds: [unjailEmbed] }).catch(console.error);
+        } catch (error) {
+            console.error('Error during auto-unjail process:', error);
+        }
+    }, duration);
 };

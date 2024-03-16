@@ -1,43 +1,20 @@
 {
-  "jailedUsers": {},
-  "jailHistory": {
-    "743888797523116183": [
-      {
-        "by": "realmia",
-        "reason": "testme",
-        "duration": "10s",
-        "timestamp": "2024-03-16T05:26:19.761Z"
-      },
-      {
-        "by": "realmia",
-        "reason": "work stupid bitch",
-        "duration": "10s",
-        "timestamp": "2024-03-16T05:48:15.799Z"
-      },
-      {
-        "by": "realmia",
-        "reason": "work stupid bitch",
-        "duration": "10s",
-        "timestamp": "2024-03-16T05:48:46.633Z"
-      },
-      {
-        "by": "realmia",
-        "reason": "test1",
-        "duration": "5s",
-        "timestamp": "2024-03-16T05:49:14.286Z"
-      },
-      {
-        "by": "realmia",
-        "reason": "test2",
-        "duration": "5s",
-        "timestamp": "2024-03-16T05:49:35.469Z"
-      },
-      {
-        "by": "realmia",
-        "reason": "test2",
-        "duration": "5s",
-        "timestamp": "2024-03-16T05:50:44.049Z"
-      }
-    ]
-  }
+    "jailedUsers": {
+        "743888797523116183": {
+            "originalRoles": [
+                "949740816040075404"
+            ],
+            "unjailTime": 1710576322121
+        }
+    },
+    "jailHistory": {
+        "743888797523116183": [
+            {
+                "jailer": "101287732608782336",
+                "reason": "wowe",
+                "durationString": "10m",
+                "timestamp": 1710575722122
+            }
+        ]
+    }
 }
