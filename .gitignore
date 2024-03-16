@@ -10,3 +10,6 @@ node_modules/
 # Ignore configuration files (if they contain sensitive data)
 .env
 .gitignore
+
+# Ignore random other stuff
+interactions/jail.js

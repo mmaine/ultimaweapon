@@ -87,8 +87,8 @@ In 99% of cases, you broke rules often enough to warrant a timeout from the serv
             removeJailedUser(targetUser.id);
 
             const unjailEmbed = new EmbedBuilder()
-                .setTitle(`${targetUser.tag} has been automatically unjailed.`)
-                .setDescription(`${targetUser.toString()} (${targetUser.id})'s jail time has expired and they have been automatically unjailed.`)
+                .setTitle(`${targetUser.tag} has served their sentence.`)
+                .setDescription(`${targetUser.toString()} (${targetUser.id})'s jail time has expired and were let back in to the server.`)
                 .setThumbnail(targetUser.displayAvatarURL())
                 .setColor('#00FF00'); // Green color for unjail notification
             await logChannel.send({ embeds: [unjailEmbed] });
