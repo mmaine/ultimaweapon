@@ -6,9 +6,9 @@ Ultima Weapon is a Discord bot designed for private use within the LPDU communit
 
 ### Working
 - Jailing a user for a duration
+- Unjailing a user pre-emptively
 
 ### Not Working
-- Unjailing a user pre-emptively
 
 ### Work in Progress
 - Additional moderation features
@@ -16,9 +16,10 @@ Ultima Weapon is a Discord bot designed for private use within the LPDU communit
 
 ## Usage
 
-just rin it
+just run it
 
 ## Commands
 
 - `/jail <@user> <reason> <duration>`: Jail a user for a specified duration.
-- (Work in Progress) `/unjail <@user>`: Unjail a user pre-emptively.
+- `/unjail <@user>`: Unjail a user pre-emptively.
+- `/jailed <@user>`: Obtain users jail history

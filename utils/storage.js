@@ -18,6 +18,11 @@ exports.getJailedUsers = () => {
     return data.jailedUsers || {};
 };
 
+exports.getJailedUser = (userId) => { // This is the function you're missing
+    const data = loadData();
+    return data.jailedUsers[userId]; // Return the data for the specified user
+};
+
 exports.setJailedUser = (userId, userInfo) => {
     const data = loadData();
     data.jailedUsers[userId] = userInfo;
@@ -37,6 +42,9 @@ exports.getJailHistory = () => {
 
 exports.addJailHistory = (userId, history) => {
     const data = loadData();
-    data.jailHistory[userId] = (data.jailHistory[userId] || []).concat(history);
+    if (!data.jailHistory[userId]) {
+        data.jailHistory[userId] = [];
+    }
+    data.jailHistory[userId].push(history);
     saveData(data);
 };

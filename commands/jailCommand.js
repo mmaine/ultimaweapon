@@ -4,32 +4,48 @@ const { setJailedUser, addJailHistory, removeJailedUser } = require('../utils/st
 const { EmbedBuilder } = require('discord.js');
 
 exports.handleJailCommand = async (interaction) => {
+    await interaction.deferReply({ ephemeral: true }); // Acknowledge the interaction immediately
+
     const targetUser = interaction.options.getUser('user', true);
     const reason = interaction.options.getString('reason', true);
     const durationString = interaction.options.getString('duration', true);
     const duration = parseDuration(durationString);
 
     if (!duration) {
-        await interaction.reply({ content: 'Invalid duration format. Use format like 10s, 5m, 10h, 20d.', ephemeral: true });
+        await interaction.editReply({ content: 'Invalid duration format. Use format like 10s, 5m, 10h, 20d.' });
         return;
     }
 
     const guild = interaction.guild;
     const memberToJail = await guild.members.fetch(targetUser.id);
-    const originalRoles = memberToJail.roles.cache.filter(role => rolesToRestoreIds.includes(role.id)).map(role => role.id);
+    const originalRoles = memberToJail.roles.cache
+        .filter(role => rolesToRestoreIds.includes(role.id))
+        .map(role => role.id);
 
     await memberToJail.roles.remove(originalRoles);
     await memberToJail.roles.add(muteRoleId);
 
     const unjailTime = Date.now() + duration;
-    setJailedUser(targetUser.id, { originalRoles, unjailTime, guildId: guild.id });
-    addJailHistory(targetUser.id, { jailer: interaction.user.id, reason, durationString, timestamp: Date.now() });
+    setJailedUser(targetUser.id, {
+        originalRoles,
+        unjailTime,
+        guildId: guild.id,
+        jailerId: interaction.user.id,
+        reason,
+        durationString
+    });
 
-    // DM to the jailed user
+    addJailHistory(targetUser.id, {
+        jailerId: interaction.user.id,
+        reason,
+        durationString,
+        timestamp: Date.now()
+    });
+
     const jailMessage = `You have been jailed in LPDU. 
 
 **What does this mean?**
-You've been assigned the Citadel Siege -role, which removes your access to view and post in channels. Once your jail has expired, your role will be removed and you will regain access to the channels.
+You've been assigned the Citadel Siege role, which removes your access to view and post in channels. Once your jail has expired, your role will be removed, and you will regain access to the channels.
 
 **Why did this happen?**
 In 99% of cases, you broke rules often enough to warrant a timeout from the server.
@@ -43,25 +59,24 @@ In 99% of cases, you broke rules often enough to warrant a timeout from the serv
         console.error(`Could not send DM to ${targetUser.tag}:`, error);
     }
 
-    await interaction.reply({ content: `You have jailed ${targetUser} for ${durationString}.`, ephemeral: true });
+    await interaction.editReply({ content: `You have jailed ${targetUser.tag} for ${durationString}.` });
 
     const embed = new EmbedBuilder()
-    .setTitle(`${targetUser.tag} has been jailed.`)
-    .setDescription(`${targetUser.toString()} (${targetUser.id}) has been sentenced to jail by staff. They have lost access to the server until they are unjailed.`)
-    .setThumbnail(targetUser.displayAvatarURL()) // Set the jailed user's profile picture as the thumbnail
-    .addFields(
-        { name: 'Jailer', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
-        //{ name: 'Jailer Profile', value: `[View Profile](${interaction.user.displayAvatarURL()})`, inline: true }, // Link to view jailer's profile picture
-        { name: 'Duration', value: durationString, inline: true },
-        { name: 'Unjail', value: `<t:${Math.floor(unjailTime / 1000)}:F>`, inline: true },
-        { name: 'Reason', value: reason, inline: false }
-    )
-    .setColor('#FF0000');
+        .setTitle(`${targetUser.tag} has been jailed.`)
+        .setDescription(`${targetUser.toString()} (${targetUser.id}) has been sentenced to jail by staff. They have lost access to the server until they are unjailed.`)
+        .setThumbnail(targetUser.displayAvatarURL())
+        .addFields(
+            { name: 'Jailer', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+            { name: 'Duration', value: durationString, inline: true },
+            { name: 'Unjail Time', value: `<t:${Math.floor(unjailTime / 1000)}:F>`, inline: true },
+            { name: 'Reason', value: reason, inline: false }
+        )
+        .setColor('#FF0000');
 
-const logChannel = await guild.channels.fetch(logChannelId);
-await logChannel.send({ embeds: [embed] });
+    const logChannel = await guild.channels.fetch(logChannelId);
+    await logChannel.send({ embeds: [embed] });
 
-    // Setting up auto-unjail with setTimeout
+    // Set up auto-unjail with setTimeout
     setTimeout(async () => {
         try {
             const refreshedMember = await guild.members.fetch(targetUser.id);
@@ -70,17 +85,15 @@ await logChannel.send({ embeds: [embed] });
                 await refreshedMember.roles.add(roleId);
             });
             removeJailedUser(targetUser.id);
-    
-            // Construct and send the unjail notification to the log channel
+
             const unjailEmbed = new EmbedBuilder()
-                .setTitle(`${targetUser.tag} has been unjailed.`)
-                .setDescription(`${targetUser.toString()} (${targetUser.id}) has regained access to the server.`)
-                .setThumbnail(targetUser.displayAvatarURL()) // Set the unjailed user's profile picture as the thumbnail
-                .setColor('#00FF00');
+                .setTitle(`${targetUser.tag} has been automatically unjailed.`)
+                .setDescription(`${targetUser.toString()} (${targetUser.id})'s jail time has expired and they have been automatically unjailed.`)
+                .setThumbnail(targetUser.displayAvatarURL())
+                .setColor('#00FF00'); // Green color for unjail notification
             await logChannel.send({ embeds: [unjailEmbed] });
         } catch (error) {
             console.error('Failed to unjail user:', error);
         }
     }, duration);
-    
 };
