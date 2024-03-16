@@ -2,18 +2,53 @@
     "jailedUsers": {
         "743888797523116183": {
             "originalRoles": [
-                "949740816040075404"
+                "949740816040075404",
+                "1207170359669817404",
+                "1191477888592130210",
+                "1194287519114743879",
+                "1181930807464558603"
             ],
-            "unjailTime": 1710576322121
+            "unjailTime": 1710666254439,
+            "guildId": "840349073210867722"
         }
     },
     "jailHistory": {
         "743888797523116183": [
             {
                 "jailer": "101287732608782336",
-                "reason": "wowe",
+                "reason": "testing fuck work plz",
+                "durationString": "30s",
+                "timestamp": 1710578249167
+            },
+            {
+                "jailer": "101287732608782336",
+                "reason": "test two",
                 "durationString": "10m",
-                "timestamp": 1710575722122
+                "timestamp": 1710578416347
+            },
+            {
+                "jailer": "101287732608782336",
+                "reason": "testing3",
+                "durationString": "50m",
+                "timestamp": 1710579061635
+            },
+            {
+                "jailer": "101287732608782336",
+                "reason": "20",
+                "durationString": "50m",
+                "timestamp": 1710579078706
+            },
+            {
+                "jailer": "101287732608782336",
+                "reason": "10",
+                "durationString": "44m",
+                "timestamp": 1710579100256
+            },
+            {
+                "jailer": "201090902603595777",
+                "reason": "test",
+                "durationString": "1d",
+                "timestamp": 1710579854439
             }
         ]
     }

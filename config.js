@@ -2,6 +2,7 @@ require('dotenv').config(); // Ensure this is at the top
 
 module.exports = {
     token: process.env.TOKEN,
+    clientId: process.env.CLIENT_ID,
     guildId: '840349073210867722',
     muteRoleId: '901408158864531476',
     allowedRoleIds: [

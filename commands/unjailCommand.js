@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
-const { rolesToRestoreIds, muteRoleId } = require('../config');
-const { removeJailedUser, getJailedUsers } = require('../utils/storage');
+const { rolesToRestoreIds, muteRoleId, logChannelId } = require('../config');
+const { removeJailedUser } = require('../utils/storage');
 
 exports.handleUnjailCommand = async (interaction) => {
     const targetUser = interaction.options.getUser('user', true);
@@ -8,28 +8,24 @@ exports.handleUnjailCommand = async (interaction) => {
     const guild = interaction.guild;
     const memberToUnjail = await guild.members.fetch(targetUser.id);
 
-    const jailedUsers = getJailedUsers();
-    const jailedUserInfo = jailedUsers[targetUser.id];
-
-    if (!jailedUserInfo) {
-        await interaction.reply({ content: `${targetUser.tag} is not currently jailed.`, ephemeral: true });
-        return;
-    }
-
-    await memberToUnjail.roles.add(jailedUserInfo.originalRoles);
+    // Proceed to unjail the user
     await memberToUnjail.roles.remove(muteRoleId);
-
+    await memberToUnjail.roles.add(rolesToRestoreIds);
     removeJailedUser(targetUser.id);
 
-    const embed = new EmbedBuilder()
-        .setTitle(`${targetUser.tag} has been pardoned.`)
-        .setDescription(`${interaction.user.tag} has pardoned ${targetUser.tag} from jail.`)
+    // Prepare and send the unjail message to the log channel
+    const logChannel = await guild.channels.fetch(logChannelId);
+    const unjailEmbed = new EmbedBuilder()
+        .setTitle(`${targetUser.tag} has been unjailed.`)
+        .setDescription(`${targetUser.toString()} (${targetUser.id}) has been unjailed by ${interaction.user.tag}.`)
+        .setThumbnail(targetUser.displayAvatarURL())
         .addFields(
-            { name: 'Sentence Left', value: `${Math.max(Math.round((jailedUserInfo.unjailTime - Date.now()) / 60000), 0)} minutes`, inline: true },
-            { name: 'Pardoner', value: `${interaction.user.tag}`, inline: true },
-            { name: 'Reason', value: reason, inline: false }
+            { name: 'Unjailed by', value: `${interaction.user.tag}`, inline: true },
+            { name: 'Reason for unjailing', value: reason, inline: true }
         )
         .setColor('#00FF00');
+    await logChannel.send({ embeds: [unjailEmbed] });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    // Respond to the user who invoked the command with an ephemeral message
+    await interaction.reply({ content: `You unjailed ${targetUser}.`, ephemeral: true });
 };
