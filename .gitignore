@@ -9,3 +9,4 @@ node_modules/
 
 # Ignore configuration files (if they contain sensitive data)
 .env
+.gitignore
