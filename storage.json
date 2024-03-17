@@ -1,31 +1,17 @@
 {
     "jailedUsers": {},
-    "jailHistory": {
+    "jailHistory": {},
+    "warnings": {
         "743888797523116183": [
             {
-                "jailerId": "101287732608782336",
-                "reason": "testing crash",
-                "durationString": "20s",
-                "timestamp": 1710587356490
-            },
-            {
-                "jailerId": "101287732608782336",
-                "reason": "testing crash",
-                "durationString": "30s",
-                "timestamp": 1710587596667
-            },
-            {
-                "jailerId": "101287732608782336",
-                "reason": "testge",
-                "durationString": "20s",
-                "timestamp": 1710589108312
-            },
-            {
-                "jailerId": "101287732608782336",
-                "reason": "testing",
-                "durationString": "20s",
-                "timestamp": 1710589205862
+                "reason": "1",
+                "severity": 1,
+                "warnedBy": "101287732608782336",
+                "timestamp": 1710674987091
             }
         ]
+    },
+    "highestSeverityReached": {
+        "743888797523116183": 1
     }
 }

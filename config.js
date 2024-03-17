@@ -23,5 +23,11 @@ module.exports = {
         '1194287519114743879', // savage
         // ... add other roles to restore
     ],
-    logChannelId: '984505541130870804'
+    logChannelId: '984505541130870804',
+    warningThresholds: [
+        { severity: 25, reason: 'Accumulated severity points reach 25', duration: '10s' },
+        { severity: 50, reason: 'Accumulated severity points reach 50', duration: '20s' },
+        { severity: 75, reason: 'Accumulated severity points reach 75', duration: '30s' },
+        { severity: 100, reason: 'Accumulated severity points reach 100', duration: '100y' },  // Simulated "permanent"
+    ]
 };

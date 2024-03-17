@@ -1,12 +1,21 @@
 const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
-const { token, clientId, guildId, muteRoleId, rolesToRestoreIds } = require('./config');
+const { token, clientId, guildId, muteRoleId, rolesToRestoreIds, logChannelId } = require('./config');
 const { handleJailCommand } = require('./commands/jailCommand');
 const { handleJailedCommand } = require('./commands/jailedCommand');
 const { handleUnjailCommand } = require('./commands/unjailCommand');
-const { checkUnjailOnStart } = require('./utils/unjailCheck');
-const { getJailedUser } = require('./utils/storage');
+const { handleWarnCommand } = require('./commands/warnCommand');
+const { handleWarningsCommand } = require('./commands/warningsCommand');
+const { handleRemoveWarningCommand } = require('./commands/removeWarningCommand');
+const { startJailCheckSchedule, decayWarnings } = require('./utils/jailSchedule');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+    ],
+});
 
 const commands = [
     {
@@ -27,7 +36,7 @@ const commands = [
             },
             {
                 name: 'duration',
-                type: 3, // STRING, assuming this is meant to be a string like "1d" or "4h"
+                type: 3, // STRING
                 description: 'The duration of the jail',
                 required: true,
             },
@@ -62,15 +71,67 @@ const commands = [
                 required: true,
             },
         ],
-    }
+    },
+    {
+        name: 'warn',
+        description: 'Warns a user',
+        options: [
+            {
+                name: 'user',
+                type: 6, // USER
+                description: 'The user to warn',
+                required: true,
+            },
+            {
+                name: 'reason',
+                type: 3, // STRING
+                description: 'The reason for the warning',
+                required: true,
+            },
+            {
+                name: 'severity',
+                type: 4, // INTEGER
+                description: 'The severity of the warning (1-100)',
+                required: true,
+            },
+        ],
+    },
+    {
+        name: 'warnings',
+        description: 'Displays warning history',
+        options: [
+            {
+                name: 'user',
+                type: 6, // USER
+                description: 'View warnings for a specific user',
+                required: false,
+            },
+        ],
+    },
+    {
+        name: 'removewarning',
+        description: 'Removes a specific warning from a user',
+        options: [
+            {
+                name: 'user',
+                type: 6, // USER
+                description: 'The user from whom to remove the warning',
+                required: true,
+            },
+            {
+                name: 'index',
+                type: 4, // INTEGER
+                description: 'The index of the warning to remove (starting from 1)',
+                required: true,
+            },
+        ],
+    },
 ];
-
 
 const rest = new REST({ version: '9' }).setToken(token);
 
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
-    
     try {
         console.log('Started refreshing application (/) commands.');
         await rest.put(
@@ -82,7 +143,8 @@ client.once('ready', async () => {
         console.error(error);
     }
 
-    await checkUnjailOnStart(client);
+    startJailCheckSchedule(client); // Start the scheduled checks for jailing and unjailing
+    setInterval(() => decayWarnings(client), 10000); // Adjust as necessary for your needs, currently every 10 seconds for testing
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -98,21 +160,22 @@ client.on('interactionCreate', async (interaction) => {
         case 'unjail':
             await handleUnjailCommand(interaction);
             break;
+        case 'warn':
+            await handleWarnCommand(interaction);
+            break;
+        case 'warnings':
+            await handleWarningsCommand(interaction);
+            break;
+        case 'removewarning':
+            await handleRemoveWarningCommand(interaction);
+            break;
+        // Include additional commands as needed.
     }
 });
-
-client.on('error', (error) => {
-    console.error('An error occurred:', error);
-    // Here you can add code to send a message to a specific channel if needed
-    const errorLogChannel = client.channels.cache.get('1218477919777718272'); // Replace with your actual error log channel ID
-    if (errorLogChannel) {
-        errorLogChannel.send(`An error occurred: ${error.message}`);
-    }
-});
-
 
 client.on('guildMemberAdd', async (member) => {
-    const jailedUser = getJailedUser(member.id);
+    // Reapply jail to rejoining members if they are still listed as jailed.
+    const jailedUser = await getJailedUser(member.id);
     if (jailedUser) {
         try {
             await member.roles.remove(rolesToRestoreIds);
@@ -122,6 +185,11 @@ client.on('guildMemberAdd', async (member) => {
             console.error(`Failed to reapply jail to ${member.user.tag}:`, error);
         }
     }
+});
+
+client.on('error', (error) => {
+    console.error('An error occurred:', error);
+    // Error logging to a specific channel can be implemented here if needed.
 });
 
 client.login(token);

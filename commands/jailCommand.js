@@ -1,99 +1,69 @@
 const { parseDuration } = require('../utils/helpers');
-const { muteRoleId, rolesToRestoreIds, logChannelId } = require('../config');
-const { setJailedUser, addJailHistory, removeJailedUser } = require('../utils/storage');
+const { muteRoleId, rolesToRestoreIds, logChannelId, allowedRoleIds } = require('../config');
+const { setJailedUser, addJailHistory } = require('../utils/storage');
 const { EmbedBuilder } = require('discord.js');
 
-exports.handleJailCommand = async (interaction) => {
-    await interaction.deferReply({ ephemeral: true }); // Acknowledge the interaction immediately
-
-    const targetUser = interaction.options.getUser('user', true);
-    const reason = interaction.options.getString('reason', true);
-    const durationString = interaction.options.getString('duration', true);
+// Separated jailing logic for reuse.
+async function jailUser(guild, user, reason, durationString, interactionUser) {
     const duration = parseDuration(durationString);
-
     if (!duration) {
-        await interaction.editReply({ content: 'Invalid duration format. Use format like 10s, 5m, 10h, 20d.' });
+        console.error('Invalid duration format for jailing.');
         return;
     }
 
-    const guild = interaction.guild;
-    const memberToJail = await guild.members.fetch(targetUser.id);
-    const originalRoles = memberToJail.roles.cache
-        .filter(role => rolesToRestoreIds.includes(role.id))
-        .map(role => role.id);
+    const memberToJail = await guild.members.fetch(user.id);
+    const originalRoles = memberToJail.roles.cache.filter(role => rolesToRestoreIds.includes(role.id)).map(role => role.id);
 
-    await memberToJail.roles.remove(originalRoles);
-    await memberToJail.roles.add(muteRoleId);
+    await memberToJail.roles.remove(originalRoles).catch(console.error);
+    await memberToJail.roles.add(muteRoleId).catch(console.error);
 
     const unjailTime = Date.now() + duration;
-    setJailedUser(targetUser.id, {
-        originalRoles,
-        unjailTime,
-        guildId: guild.id,
-        jailerId: interaction.user.id,
-        reason,
-        durationString
-    });
+    setJailedUser(user.id, { originalRoles, unjailTime, guildId: guild.id, jailerId: interactionUser.id, reason, durationString });
+    addJailHistory(user.id, { jailerId: interactionUser.id, reason, durationString, timestamp: Date.now() });
 
-    addJailHistory(targetUser.id, {
-        jailerId: interaction.user.id,
-        reason,
-        durationString,
-        timestamp: Date.now()
-    });
-
-    const jailMessage = `You have been jailed in LPDU. 
-
-**What does this mean?**
-You've been assigned the Citadel Siege role, which removes your access to view and post in channels. Once your jail has expired, your role will be removed, and you will regain access to the channels.
-
-**Why did this happen?**
-In 99% of cases, you broke rules often enough to warrant a timeout from the server.
-
-**When am I getting off the role?**
-<t:${Math.floor(unjailTime / 1000)}:F> is when you will be able to access LPDU again. If your role has not been removed at the given time, you may inquire via #create-a-ticket and reach out to staff.`;
-
-    try {
-        await targetUser.send(jailMessage);
-    } catch (error) {
-        console.error(`Could not send DM to ${targetUser.tag}:`, error);
-    }
-
-    await interaction.editReply({ content: `You have jailed ${targetUser.tag} for ${durationString}.` });
-
+    const logChannel = await guild.channels.fetch(logChannelId);
     const embed = new EmbedBuilder()
-        .setTitle(`${targetUser.tag} has been jailed.`)
-        .setDescription(`${targetUser.toString()} (${targetUser.id}) has been sentenced to jail by staff. They have lost access to the server until they are unjailed.`)
-        .setThumbnail(targetUser.displayAvatarURL())
+        .setTitle(`${user.tag} has been jailed.`)
+        .setDescription(`${user.toString()} (${user.id}) has been sentenced to jail.`)
+        .setThumbnail(user.displayAvatarURL())
         .addFields(
-            { name: 'Jailer', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+            { name: 'Jailer', value: `${interactionUser.tag} (${interactionUser.id})`, inline: true },
             { name: 'Duration', value: durationString, inline: true },
             { name: 'Unjail Time', value: `<t:${Math.floor(unjailTime / 1000)}:F>`, inline: true },
             { name: 'Reason', value: reason, inline: false }
         )
         .setColor('#FF0000');
+    logChannel.send({ embeds: [embed] }).catch(console.error);
 
-    const logChannel = await guild.channels.fetch(logChannelId);
-    await logChannel.send({ embeds: [embed] });
+    const jailMessage = `You have been jailed for ${durationString} due to: ${reason}.`;
+    try {
+        await user.send(jailMessage);
+    } catch (error) {
+        console.error(`Could not send DM to ${user.tag}:`, error);
+    }
+}
 
-    // Set up auto-unjail with setTimeout
-    setTimeout(async () => {
-        try {
-            const refreshedMember = await guild.members.fetch(targetUser.id);
-            await refreshedMember.roles.remove(muteRoleId);
-            originalRoles.forEach(async (roleId) => {
-                await refreshedMember.roles.add(roleId);
-            });
-            removeJailedUser(targetUser.id);
+// This handles the Discord command interaction
+exports.handleJailCommand = async (interaction) => {
+    if (!interaction.member.roles.cache.some(role => allowedRoleIds.includes(role.id))) {
+        await interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+        return;
+    }
 
-            const unjailEmbed = new EmbedBuilder()
-                .setTitle(`${targetUser.tag} has served their sentence.`)
-                .setDescription(`${targetUser.toString()} (${targetUser.id})'s jail time has expired and were let back in to the server.`)
-                .setThumbnail(targetUser.displayAvatarURL())
-                .setColor('#00FF00'); // Green color for unjail notification
-            await logChannel.send({ embeds: [unjailEmbed] });
-        } catch (error) {
-            console.error('Failed to unjail user:', error);
-        }
-    }, duration);
+    await interaction.deferReply({ ephemeral: true });
+
+    const user = interaction.options.getUser('user', true);
+    const reason = interaction.options.getString('reason', true);
+    const durationString = interaction.options.getString('duration', true);
+
+    try {
+        await jailUser(interaction.guild, user, reason, durationString, interaction.user);
+        await interaction.editReply({ content: `You have jailed ${user.tag} for ${durationString}.` });
+    } catch (error) {
+        console.error('Jail command failed:', error);
+        await interaction.editReply({ content: `Error: ${error.message}` });
+    }
 };
+
+// Exporting the jailUser function for use in warnCommand and potentially others
+exports.jailUser = jailUser;

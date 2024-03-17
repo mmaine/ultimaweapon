@@ -13,3 +13,6 @@ node_modules/
 
 # Ignore random other stuff
 interactions/jail.js
+
+#Ignore personalized storage data
+storage.json 

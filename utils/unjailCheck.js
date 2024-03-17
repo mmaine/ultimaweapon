@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { muteRoleId, rolesToRestoreIds, logChannelId } = require('../config');
-const { getJailedUsers, removeJailedUser } = require('./storage');
+const { getJailedUsers, removeJailedUser } = require('.utils/storage');
 
 exports.checkUnjailOnStart = async (client) => {
     const now = Date.now();
